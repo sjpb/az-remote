@@ -1,0 +1,18 @@
+# config for create-vm:
+rgname: ansible
+location: ukwest
+vm_size: Standard_D2_v3 
+image:
+  offer: CentOS-HPC
+  publisher: OpenLogic
+  sku: '7.6'
+# this should match your azure user:
+admin_user: jacob
+admin_pub_keys:
+  # your Azure key
+- path: "/home/{{ admin_user }}/.ssh/authorized_keys"
+  key_data: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+  # my public key
+- path: "/home/{{ admin_user }}/.ssh/authorized_keys"
+  key_data: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDuNoaIV5Nw4HGblhFg6BOTpSlO+QZWxsZOtiaxR71CcP85+Sk8LQUY45L6gtO6n3swTLvkI96nTEQWjY7Cw2Z5WirO8Jctm0dYFtqU17jSkrgQymF7rHy/JCOVoIyLBlt/TJuTU5IRhw3Sd6HjAqvYstAV+8Bd1UWkzFQK/gUGx3SaqyWvKcINmSmszdS7+ZM/07Y9vXPW4MiJzWHQl1yqCEQ+QUttuYOxbNaHAwb9JOPgzsBnSFHW4skpCYKl4nsssE4um68Da7V0YFumwWXc/T6PBqwdMf2E2Ix/dFympzZGJA86mZFN6+NB2vvxKV7eY6BkKbbsinzQlCQT78AT steveb@DESKTOP-NSUK66K"
+cred_path: ~/.azure/credentials

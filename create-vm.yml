@@ -1,0 +1,103 @@
+# Create a VM for an ansible control host set up for remote collaboration
+
+- name: Create VM
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: Create resource group
+    azure_rm_resourcegroup:
+      name: "{{ rgname }}"
+      location: "{{ location }}"
+  - name: Create virtual network
+    azure_rm_virtualnetwork:
+      resource_group: "{{ rgname }}"
+      name: "{{ rgname }}_vnet"
+      address_prefixes: "10.0.0.0/16"
+  - name: Add subnet
+    azure_rm_subnet:
+      resource_group: "{{ rgname }}"
+      name: "{{ rgname }}_subnet"
+      address_prefix: "10.0.1.0/24"
+      virtual_network: "{{ rgname }}_vnet"
+  - name: Create public IP address
+    azure_rm_publicipaddress:
+      resource_group: "{{ rgname }}"
+      allocation_method: Static
+      name: "{{ rgname }}_pubip"
+    register: pub_ip
+  - name: Create Network Security Group allowing SSH
+    azure_rm_securitygroup:
+      resource_group: "{{ rgname }}"
+      name: "{{ rgname }}_nsg"
+      rules:
+        - name: SSH
+          protocol: Tcp
+          destination_port_range: 22
+          access: Allow
+          priority: 1001
+          direction: Inbound
+  - name: Create virtual network interface card for master VM
+    azure_rm_networkinterface:
+      resource_group: "{{ rgname }}"
+      name: "{{ rgname }}_masternic"
+      virtual_network: "{{ rgname }}_vnet"
+      subnet_name: "{{rgname }}_subnet"
+      security_group: "{{ rgname }}_nsg"
+      ip_configurations:
+        - name: 'default'
+          primary: yes
+          public_ip_address_name: "{{ rgname }}_pubip"
+  - name: Create master VM
+    azure_rm_virtualmachine:
+      resource_group: "{{ rgname }}"
+      name: "{{ rgname }}-vm"
+      vm_size: "{{ vm_size }}"
+      admin_username: "{{ admin_user }}"
+      ssh_password_enabled: false
+      ssh_public_keys: "{{ admin_pub_keys }}"
+      network_interfaces: "{{ rgname }}_masternic"
+      image:
+        offer: "{{ image.offer }}"
+        publisher: "{{ image.publisher }}"
+        sku: "{{ image.sku }}"
+        version: latest
+  - debug:
+      msg: "VM public IP address {{ pub_ip.state.ip_address }}"
+  - name: create inventory
+    add_host:
+      name: "{{ pub_ip.state.ip_address }}"
+      groups: ansible_control
+
+- name: install ansible
+  hosts: ansible_control
+  user: "{{ admin_user }}"
+  tasks:
+    - yum:
+        name: gcc,libffi-devel,python-devel,openssl-devel
+      become: yes
+    - yum:
+        name: epel-release
+        enablerepo: extras
+        state: present
+      become: yes
+    - yum:
+        name: python-pip,python-wheel
+        state: present
+      become: yes
+    - name: install ansible
+      pip:
+        name: "ansible[azure]"
+        state: present
+      become: yes
+    - file:
+        path: /home/{{ admin_user }}/.azure
+        state: directory
+    - name: copy credentials
+      copy:
+        src: "{{ cred_path }}"
+        dest: /home/{{ admin_user }}/.azure/credentials
+    - name: install tmux
+      yum:
+        name: tmux
+        state: present
+      become: yes
